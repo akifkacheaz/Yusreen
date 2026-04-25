@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZB-5 Smart Dashboard (Pro)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #eef2f3;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .app-container {
+            background-color: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 420px;
+            padding: 25px;
+            box-sizing: border-box;
+        }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h2 { margin: 0; color: #2c3e50; font-size: 24px; }
+        .header p { margin: 5px 0 0 0; color: #7f8c8d; font-size: 14px; }
+
+        .control-group { margin-bottom: 15px; }
+        .control-group label { display: block; font-weight: 600; color: #34495e; margin-bottom: 8px; }
+        
+        input[type=range], select {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #bdc3c7;
+            font-family: 'Sarabun', sans-serif;
+            font-size: 16px;
+        }
+        input[type=range] { padding: 0; accent-color: #3498db; }
+
+        .ph-display {
+            text-align: center;
+            font-size: 56px;
+            font-weight: 700;
+            color: #2980b9;
+            margin: 10px 0;
+            line-height: 1;
+        }
+
+        .status-box {
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: 0.3s;
+        }
+        .status-title { font-size: 22px; font-weight: 700; margin-bottom: 5px; }
+        .status-desc { font-size: 15px; margin: 0; }
+
+        /* สีสถานะ */
+        .bg-normal { background-color: #d4edda; color: #155724; border: 2px solid #c3e6cb; }
+        .bg-warning { background-color: #fff3cd; color: #856404; border: 2px solid #ffeeba; }
+        .bg-danger { background-color: #f8d7da; color: #721c24; border: 2px solid #f5c6cb; }
+        .bg-critical { background-color: #dc3545; color: white; border: 2px solid #c82333; }
+
+        .action-box {
+            background-color: #f4f6f7;
+            border-left: 5px solid #3498db;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .action-box h4 { margin: 0 0 10px 0; color: #2c3e50; font-size: 16px; }
+        .action-list { margin: 0; padding-left: 20px; font-size: 15px; color: #34495e; line-height: 1.6; }
+
+        .btn-save {
+            width: 100%;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(39, 174, 96, 0.2);
+            transition: 0.2s;
+            font-family: 'Sarabun', sans-serif;
+        }
+        .btn-save:hover { background-color: #219a52; transform: translateY(-2px); }
+
+        .chart-container { margin-top: 25px; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="header">
+        <h2>ZB-5 Smart Dashboard</h2>
+        <p>ระบบประเมินนวัตกรรมปรับสมดุลน้ำ (Cost-Effective)</p>
+    </div>
+
+    <div class="control-group">
+        <label>1. เลื่อนปรับค่า pH ของบ่อปัจจุบัน:</label>
+        <div class="ph-display" id="phValue">7.00</div>
+        <input type="range" id="phSlider" min="4.0" max="9.0" step="0.1" value="7.0" oninput="updateDashboard()">
+    </div>
+
+    <div class="control-group">
+        <label>2. เลือกขนาดบ่อกุ้งของคุณ:</label>
+        <select id="pondSize" onchange="updateDashboard()">
+            <option value="0.5">บ่ออนุบาล / บ่อเล็ก (0.5 ไร่)</option>
+            <option value="1" selected>บ่อมาตรฐาน (1 ไร่)</option>
+            <option value="2">บ่อขนาดกลาง (2 ไร่)</option>
+            <option value="5">บ่อขนาดใหญ่ (5 ไร่)</option>
+        </select>
+    </div>
+
+    <div id="statusBox" class="status-box bg-warning">
+        <div class="status-title" id="statusTitle">เฝ้าระวัง</div>
+        <p class="status-desc" id="statusDesc">กุ้งเริ่มกินอาหารลดลง</p>
+    </div>
+
+    <div class="action-box">
+        <h4>💡 คำแนะนำการใช้งานที่คุ้มทุนที่สุด:</h4>
+        <ul class="action-list" id="actionList">
+            </ul>
+    </div>
+
+    <button class="btn-save" onclick="saveData()">⏱️ บันทึกค่าน้ำ (จำลองกราฟแกนเวลา)</button>
+
+    <div class="chart-container">
+        <canvas id="phChart"></canvas>
+    </div>
+</div>
+
+<script>
+    // ตัวแปรสำหรับกราฟ
+    let historyData = [];
+    let timeLabels = [];
+    let clickCount = 0; // เพื่อนับจำนวนครั้งที่กดบันทึก
+
+    // ตั้งค่ากราฟ Chart.js
+    let ctx = document.getElementById('phChart').getContext('2d');
+    let phChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: timeLabels,
+            datasets: [{
+                label: 'ค่า pH ในรอบวัน',
+                data: historyData,
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52, 152, 219, 0.2)',
+                borderWidth: 3,
+                pointBackgroundColor: '#e74c3c',
+                pointRadius: 5,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: { min: 4, max: 9, title: { display: true, text: 'ค่า pH' } },
+                x: { title: { display: true, text: 'เวลา' } }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+
+    // ฟังก์ชันคำนวณและแสดงผล
+    function updateDashboard() {
+        let ph = parseFloat(document.getElementById('phSlider').value);
+        let pondSize = parseFloat(document.getElementById('pondSize').value);
+        
+        document.getElementById('phValue').innerText = ph.toFixed(2);
+
+        let statusBox = document.getElementById('statusBox');
+        let statusTitle = document.getElementById('statusTitle');
+        let statusDesc = document.getElementById('statusDesc');
+        let actionList = document.getElementById('actionList');
+
+        statusBox.className = "status-box"; // ล้างคลาสสี
+
+        let baseAmount = 0;
+
+        // เช็คระดับความรุนแรง
+        if (ph >= 7.5) {
+            statusBox.classList.add("bg-normal");
+            statusTitle.innerText = "ระดับ: ปกติ (สมดุล)";
+            statusDesc.innerText = "น้ำมีคุณภาพดี กุ้งแข็งแรง";
+        } 
+        else if (ph >= 7.0) {
+            statusBox.classList.add("bg-warning");
+            statusTitle.innerText = "ระดับ: เฝ้าระวัง";
+            statusDesc.innerText = "กุ้งเริ่มกินอาหารลดลง เปลือกนิ่ม";
+            baseAmount = 1; // 1 กก./ไร่
+        } 
+        else if (ph >= 6.5) {
+            statusBox.classList.add("bg-danger");
+            statusTitle.innerText = "ระดับ: อันตราย";
+            statusDesc.innerText = "กุ้งหยุดกินอาหาร เสี่ยงติดเชื้อ EMS";
+            baseAmount = 100; // 100 กก./ไร่
+        } 
+        else {
+            statusBox.classList.add("bg-critical");
+            statusTitle.innerText = "ระดับ: วิกฤต (ฉุกเฉิน)";
+            statusDesc.innerText = "กุ้งช็อกน้ำ ลอยหัว ต้องแก้ด่วน!";
+            baseAmount = 1600; // 1600 กก./ไร่
+        }
+
+        // --- ส่วนคำนวณความคุ้มค่า (Cost-Effective Logic) ---
+        let totalAmount = baseAmount * pondSize;
+
+        if (baseAmount === 0) {
+            actionList.innerHTML = "<li>✅ <strong>ไม่ต้องเติม ZB-5</strong></li><li>🔍 ตรวจวัดค่าน้ำตามรอบปกติทุกวัน</li>";
+        } else {
+            if (pondSize < 1) {
+                // บ่อเล็ก: หว่านโดยตรง
+                actionList.innerHTML = `
+                    <li>⚖️ ปริมาณที่ต้องใช้: <strong>${totalAmount} กก.</strong></li>
+                    <li>⚙️ <strong>วิธีใส่:</strong> สามารถ<strong>หว่าน/สาดกระจายทั่วบ่อได้โดยตรง</strong> เนื่องจากบ่อมีขนาดเล็ก ช่วยให้แก้ปัญหาได้ฉับไว</li>`;
+            } else {
+                // บ่อใหญ่: ใช้ทุ่นหน้าเครื่องตีน้ำ
+                let batchDose = "";
+                if (baseAmount === 1) batchDose = "1 - 2 กก. ต่อจุด";
+                else if (baseAmount === 100) batchDose = "10 - 20 กก. ต่อจุด";
+                else batchDose = "50 - 100 กก. ต่อจุด"; // แบ่งใส่ทีละน้อย ไม่ใส่ 1,600 กก. ทีเดียว
+
+                actionList.innerHTML = `
+                    <li>⚠️ ปริมาณปรับสมดุลเต็มบ่อคือ ${totalAmount.toLocaleString()} กก.</li>
+                    <li style="color:#d35400;">💰 <strong>วิธีประหยัดงบ (Smart Dose):</strong> แบ่งใส่รอบละ <strong>${batchDose}</strong></li>
+                    <li>⚙️ <strong>วิธีใส่:</strong> นำวัสดุบรรจุใส่ถุงตาข่าย <strong>นำไปผูกหน้าเครื่องตีน้ำ</strong> ให้กระแสน้ำพัดพาสารไปทั่วบ่อ ป้องกันกุ้งช็อกและลดภาระแรงงาน</li>`;
+            }
+        }
+    }
+
+    // ฟังก์ชันบันทึกกราฟและจำลองเวลา
+    function saveData() {
+        let ph = parseFloat(document.getElementById('phSlider').value);
+        
+        // จำลองเวลา เริ่ม 06:00 น. เพิ่มทีละ 2 ชม.
+        let startHour = 6;
+        let currentHour = (startHour + (clickCount * 2)) % 24;
+        let timeString = (currentHour < 10 ? '0' + currentHour : currentHour) + ':00 น.';
+
+        // เก็บข้อมูลลง Array
+        historyData.push(ph);
+        timeLabels.push(timeString);
+        
+        // อัปเดตกราฟ
+        phChart.update();
+        
+        clickCount++; // เพิ่มรอบ
+    }
+
+    // รันครั้งแรกตอนโหลดหน้าเว็บ
+    updateDashboard();
+</script>
+
+</body>
+</html>
